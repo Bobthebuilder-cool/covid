@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>COVID-19 Tracking of the World</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.6.0/dist/leaflet.css"
+    integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ=="
+    crossorigin=""/>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./css/map.css">
+</head>
+<body>
+    <div id="mapid"></div>
+    <div class="info-container">
+    <button id="js-info-btn" onclick="toggleShowInfo();">
+        <i class="fas fa-info-circle"></i>
+    </button>
+    <p>Show Extra Information</p>
+</div>
+
+    <div class="board" id="js-board">
+        <div class="board-container">
+            <h1>COVID-19 Map Tracker</h1>
+        </div>
+        <div class="Nice">
+        <p>Global Information:</p>
+        </div>
+        <div class="world-stat">
+            <div>
+                <p>Confirmed:</p>
+                <p id="js-confirmed"> Confirmed:</p>
+            </div>
+            <div>
+            <p>Deaths:</p>
+            <p id="js-deaths"> Deaths:</p>
+        </div>
+
+        </div>
+        <div class="board-list">
+            <ul id="js-list">
+
+            </ul>
+        </div>
+    </div>
+    <div class="info-box"></div>
+     <!-- Make sure you put this AFTER Leaflet's CSS -->
+    <script src="https://unpkg.com/leaflet@1.6.0/dist/leaflet.js"
+    integrity="sha512-gZwIG9x3wUXg2hdXF6+rVkLF/0Vi9U8D2Ntg4Ga5I5BZpVkVxlJWbSQtXPSiUTtC0TjtGOmxa1AJPuV0CPthew=="
+    crossorigin=""></script>
+    <script src="https://kit.fontawesome.com/07327420e5.js" crossorigin="anonymous"></script>
+    <script>
+    var mymap = L.map('mapid').setView([13.7563, 100.5018], 5);
+    L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoiYm9idGhlYnVpbGRlcjAxMiIsImEiOiJjazh3ZmJiMjIwdnVnM2pudmZyanAzcXRhIn0.p83Q91X_lAmXG6bFe3njVA', {
+        attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors, <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
+        maxZoom: 18,
+        id: 'mapbox/streets-v11',
+        tileSize: 512,
+        zoomOffset: -1,
+        accessToken: 'your.mapbox.access.token'
+    }).addTo(mymap); 
+    var myIcon = L.divIcon({className: 'my-div-icon'});
+    //var marker = L.marker([13.7563, 100.5018], {icon: myIcon}).addTo(mymap).bindPopup("Hi BKK YOLO");
+    
+    const API = "https://coronavirus-tracker-api.herokuapp.com/v2/locations";
+    let countryList= "";
+    fetch(API)
+    .then((response) => {
+        return response.json();
+    })
+    .then((data) => {
+        const {locations, latest:{confirmed, deaths}} = data
+        console.log(confirmed,deaths)
+        document.getElementById("js-confirmed").innerText = confirmed;
+        document.getElementById("js-deaths").innerText = deaths;
+        //console.log("locations :",locations);
+        locations.map(l => {
+            const {country, country_population, province, coordinates:{latitude, longitude}, latest:{confirmed, recovered, deaths} } = l
+            let zoneName = getZone(confirmed);
+            if(province != ''){
+                countryList +=`<li confirmed=${confirmed} population=${country_population} deaths=${deaths} >${country} : ${province}</li>`
+            }else{
+                countryList +=`<li confirmed=${confirmed} population=${country_population} deaths=${deaths} >${country}</li>`
+            }
+            var myIcon = L.divIcon({className: zoneName});
+            let popText = `<p class="country-name">${country} : ${province}</p><p class="detail"> Confirmed: ${confirmed} Deaths: ${deaths}</p>`
+            return(
+                L.marker([latitude, longitude], {icon: myIcon}).addTo(mymap).bindPopup(popText)    
+            )
+        })
+        document.getElementById("js-list").innerHTML = countryList;
+    
+        var elements = document.getElementsByTagName("li");
+
+        var getListData = function() {
+            var deathVal = this.getAttribute("deaths");
+            var populationVal = this.getAttribute("population");
+            var confirmedVal = this.getAttribute("confirmed")
+            var countryVal = this.textContent;
+
+            var infoBox = document.querySelector(".info-box");
+            var isInfoBoxActive = infoBox.classList.contains("active")
+            infoBox.innerHTML = `<div>
+                <h2>${countryVal}</h2>
+                <p>Population: ${populationVal}</p>
+                <p>Confirmed: ${confirmedVal}</p>
+                <p>Deaths: ${deathVal}</p>
+                </div>`;
+            if(!isInfoBoxActive){
+                infoBox.classList.add("active");
+            }
+    };
+
+        for (var i = 0; i < elements.length; i++) {
+            elements[i].addEventListener('click', getListData, false);
+    }
+
+    }); 
+
+        function getZone(confirmed){
+            let zone = "";
+            if(confirmed > 0 && confirmed <200){
+                zone = "green-zone";
+            }else if(confirmed >= 201 && confirmed <500){
+                zone = "yellow-zone"
+            }else if(confirmed >= 501 && confirmed <800){
+                zone = "orange-zone"
+            }else if(confirmed >= 801 && confirmed <1100){
+                zone = "red-zone"
+            }else if(confirmed >= 1101 && confirmed <1400){
+                zone = "darkred-zone"
+            }else{
+                zone = "violet-zone"
+            }
+            return zone;
+        }
+        function toggleShowInfo(){
+            var el = document.getElementById("js-board");
+           el.classList.toggle("active"); 
+            }
+
+    </script>
+</body>
+</html>
